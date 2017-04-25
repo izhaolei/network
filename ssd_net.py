@@ -63,7 +63,7 @@ def residual_unit(data, num_filter, stride, dim_match, name, bottle_neck=True, n
         eltwise = bn2 + shortcut
         return mx.sym.Activation(data=eltwise, act_type='relu', name=name + '_relu')
 
-def resnext(units, num_stages, filter_list, num_classes, num_group, bottle_neck=True, bn_mom=0.9, workspace=256, memonger=False):
+def resnext(units, num_stages, filter_list,  num_group, bottle_neck=True, bn_mom=0.9, workspace=256, memonger=False):
     num_unit = len(units)
     assert(num_unit == num_stages)
     data = mx.sym.Variable(name='data')
@@ -123,7 +123,7 @@ def residual_predict(data):
     return mx.sym.Activation(data=short_cut,act_type='relu')
     
 
-def get_feature_layer(num_classes,conv_workspace=256,num_group=32):
+def get_feature_layer(conv_workspace=256,num_group=32):
     filter_list = [64, 128, 128, 256, 512]
     bottle_neck = True
     num_stages = 4
@@ -131,7 +131,6 @@ def get_feature_layer(num_classes,conv_workspace=256,num_group=32):
     return resnext(units      = units,
                   num_stages  = num_stages,
                   filter_list = filter_list,
-                  num_classes = num_classes,
                   num_group   = num_group, 
                   bottle_neck = bottle_neck,
                   workspace   = conv_workspace)
