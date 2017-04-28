@@ -1,44 +1,30 @@
 import mxnet as mx
 import numpy as np
 
-def conv_act_layer(from_layer, name, num_filter, kernel=(1,1), pad=(0,0), \
-    stride=(1,1), act_type="relu", use_batchnorm=False):
-    """
-    wrapper for a small Convolution group
+def conv_act_layer(data, name,num_filter, stride,kernel=(1,1),  pad=(1,1), num_group=32, bn_mom=0.9, workspace=256):
 
-    Parameters:
-    ----------
-    from_layer : mx.symbol
-        continue on which layer
-    name : str
-        base name of the new layers
-    num_filter : int
-        how many filters to use in Convolution layer
-    kernel : tuple (int, int)
-        kernel size (h, w)
-    pad : tuple (int, int)
-        padding size (h, w)
-    stride : tuple (int, int)
-        stride size (h, w)
-    act_type : str
-        activation type, can be relu...
-    use_batchnorm : bool
-        whether to use batch normalization
+    conv1 = mx.sym.Convolution(data=data, num_filter=int(num_filter*0.5), kernel=(1,1), stride=(1,1), pad=(0,0),
+                               no_bias=True, workspace=workspace, name=name + '_conv1')
+    bn1 = mx.sym.BatchNorm(data=conv1, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn1')
+    act1 = mx.sym.Activation(data=bn1, act_type='relu', name=name + '_relu1')
 
-    Returns:
-    ----------
-    (conv, relu) mx.Symbols
-    """
-    assert not use_batchnorm, "batchnorm not yet supported"
-    bias = mx.symbol.Variable(name="conv{}_bias".format(name),
-        init=mx.init.Constant(0.0), attr={'__lr_mult__': '2.0'})
-    conv = mx.symbol.Convolution(data=from_layer, bias=bias, kernel=kernel, pad=pad, \
-        stride=stride, num_filter=num_filter, name="conv{}".format(name))
-    relu = mx.symbol.Activation(data=conv, act_type=act_type, \
-        name="{}{}".format(act_type, name))
-    if use_batchnorm:
-        relu = mx.symbol.BatchNorm(data=relu, name="bn{}".format(name))
-    return conv, relu
+        
+    conv2 = mx.sym.Convolution(data=act1, num_filter=int(num_filter*0.5), num_group=num_group, kernel=(3,3), stride=stride, pad=pad,
+                               no_bias=True, workspace=workspace, name=name + '_conv2')
+    bn2 = mx.sym.BatchNorm(data=conv2, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn2')
+    act2 = mx.sym.Activation(data=bn2, act_type='relu', name=name + '_relu2')
+
+        
+    conv3 = mx.sym.Convolution(data=act2, num_filter=num_filter, kernel=(1,1), stride=(1,1), pad=(0,0), no_bias=True,
+                               workspace=workspace, name=name + '_conv3')
+    bn3 = mx.sym.BatchNorm(data=conv3, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_bn3')
+
+    shortcut_conv = mx.sym.Convolution(data=data, num_filter=num_filter, kernel=kernel, stride=stride, no_bias=True,
+                                       workspace=workspace, name=name+'_sc')
+    shortcut = mx.sym.BatchNorm(data=shortcut_conv, fix_gamma=False, eps=2e-5, momentum=bn_mom, name=name + '_sc_bn')
+
+    eltwise =  bn3 + shortcut
+    return eltwise, mx.sym.Activation(data=eltwise, act_type='relu', name=name + '_relu')
 
 def multibox_layer(from_layers, num_classes, sizes=[.2, .95],
                     ratios=[1], normalization=-1, num_channels=[],
@@ -46,7 +32,6 @@ def multibox_layer(from_layers, num_classes, sizes=[.2, .95],
     """
     the basic aggregation module for SSD detection. Takes in multiple layers,
     generate multiple object detection targets by customized layers
-
     Parameters:
     ----------
     from_layers : list of mx.symbol
@@ -71,7 +56,6 @@ def multibox_layer(from_layers, num_classes, sizes=[.2, .95],
     steps : list
         specify steps for each MultiBoxPrior layer, leave empty, it will calculate
         according to layer dimensions
-
     Returns:
     ----------
     list of outputs, as [loc_preds, cls_preds, anchor_boxes]

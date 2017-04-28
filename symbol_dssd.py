@@ -17,29 +17,27 @@ def get_symbol_train(num_classes=20, nms_thresh=0.5, force_suppress=False, nms_t
     
     feature_net1,feature_net2,feature_net3,feature_net4=get_feature_layer()
 
-    conv1, relu1 = conv_act_layer(feature_net4, "8_1", 512, kernel=(1,1), pad=(0,0), 
-                                  stride=(1,1), act_type="relu", use_batchnorm=False)
-    conv2, relu2 = conv_act_layer(relu1, "8_2", 512, kernel=(3,3), pad=(1,1), 
-                                  stride=(2,2), act_type="relu", use_batchnorm=False)
-    conv3, relu3 = conv_act_layer(relu2, "9_1", 512, kernel=(1,1), pad=(0,0), 
-                                  stride=(1,1), act_type="relu", use_batchnorm=False)
-    conv4, relu4 = conv_act_layer(relu3, "9_2", 256, kernel=(3,3), pad=(1,1), 
-                                      stride=(2,2), act_type="relu", use_batchnorm=False)
-    deconv1=deconv_layer(relu4,relu2)
-    deconv2=deconv_layer(deconv1,feature_net4,deconv_kernel=(2,2),deconv_pad=(0,0))
-    deconv3=deconv_layer(deconv2,feature_net3)
+    conv1, relu1 = conv_act_layer(feature_net4, "8_1", 512, stride=(2,2))
+    conv2, relu2 = conv_act_layer(relu1, "9_1", 512, stride=(2,2))
+    conv3, relu3 = conv_act_layer(relu2, "10_1", 512, stride=(2,2))
+    conv4, relu4 = conv_act_layer(relu3, "11_1", 512, stride=(1,1),pad=(0,0),kernel=(3,3))
+    deconv1=deconv_layer(relu4,relu3,deconv_kernel=(3,3),deconv_pad=(0,0))
+    deconv2=deconv_layer(deconv1,relu2)
+    deconv3=deconv_layer(deconv2,relu1,deconv_kernel=(2,2),deconv_pad=(0,0))
+    deconv4=deconv_layer(deconv3,feature_net4,deconv_kernel=(2,2),deconv_pad=(0,0))
+    deconv5=deconv_layer(deconv4,feature_net2,deconv_kernel=(2,2),deconv_pad=(0,0))
     layer1=residual_predict(relu4)
     layer2=residual_predict(deconv1)
     layer3=residual_predict(deconv2)
     layer4=residual_predict(deconv3)
-    from_layers = [layer4, layer3, layer2, layer1]
-    ratios = [[1,2,.5], [1,2,.5,3,1./3], [1,2,.5,3,1./3], [1,2,.5,3,1./3]]
-    normalizations = [20, -1, -1, -1]
-    sizes = [0.1,0.8]
-    num_channels = [512]
-    loc_preds, cls_preds, anchor_boxes = multibox_layer(from_layers, \
-        num_classes, sizes=sizes, ratios=ratios, normalization=normalizations, \
-        num_channels=num_channels, clip=False, interm_layer=0)
+    layer5=residual_predict(deconv4)
+    layer6=residual_predict(deconv5)
+    from_layers = [layer6,layer5,layer4, layer3, layer2, layer1]
+    sizes = [[.1, .141], [.2,.272], [.37, .447], [.54, .619], [.71, .79], [.88, .961]]
+    ratios = [[1,2,.5], [1,2,.5,3,1./3], [1,2,.5,3,1./3], [1,2,.5,3,1./3], [1,2,.5], [1,2,.5]]
+    loc_preds, cls_preds, anchor_boxes = multibox_layer(
+            from_layers, num_classes, sizes=sizes, 
+            ratios=ratios, clip=False, interm_layer=0)
 
     tmp = mx.contrib.symbol.MultiBoxTarget(
         *[anchor_boxes, label, cls_preds], overlap_threshold=.5, \
@@ -102,7 +100,6 @@ def get_symbol(num_classes=20, nms_thresh=0.5, force_suppress=False, nms_topk=40
         name="detection", nms_threshold=nms_thresh, force_suppress=force_suppress,
         variances=(0.1, 0.1, 0.2, 0.2), nms_topk=nms_topk)
     return out
-net=get_symbol()
-mx.viz.plot_network(net).view() 
     
-    
+out = get_symbol_train()
+mx.viz.plot_network(out,shape={'data':(16,3,320,320),'label':(16,5,50)}).view()

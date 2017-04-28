@@ -76,7 +76,7 @@ def resnext(units, num_stages, filter_list,  num_group, bottle_neck=True, bn_mom
     body = mx.symbol.Pooling(data=body, kernel=(3, 3), stride=(2,2), pad=(1,1), pool_type='max')
 
     for i in range(num_stages):
-        body = residual_unit(body, filter_list[i+1], (1 if i==0 else 2, 1 if i==0 else 2), False,
+        body = residual_unit(body, filter_list[i+1], (1 if (i==0 or i==num_stages-1) else 2, 1 if  (i==0 or i==num_stages-1) else 2), False,
                              name='stage%d_unit%d' % (i + 1, 1), bottle_neck=bottle_neck, num_group=num_group, 
                              bn_mom=bn_mom, workspace=workspace, memonger=memonger)
         for j in range(units[i]-1):
@@ -123,7 +123,7 @@ def residual_predict(data):
     return mx.sym.Activation(data=short_cut,act_type='relu')
     
 
-def get_feature_layer(conv_workspace=256,num_group=32):
+def get_feature_layer(conv_workspace=512,num_group=32):
     filter_list = [64, 128, 128, 256, 512]
     bottle_neck = True
     num_stages = 4
@@ -135,9 +135,9 @@ def get_feature_layer(conv_workspace=256,num_group=32):
                   bottle_neck = bottle_neck,
                   workspace   = conv_workspace)
 
-net,net1,net2,net3 = get_feature_layer(10)
-#ne2=residual_predict(net3)
-#ne3=mx.sym.Convolution(data=ne2,num_filter=1024,kernel=(3,3),stride=(2,2),pad=(1,1))
-#ne4=mx.sym.Deconvolution(data=ne3,num_filter=512,kernel=(2,2),stride=(2,2),pad=(0,0))
-#ne=deconv_layer(ne3,ne2)
-mx.viz.plot_network(net3,shape={'data':(128,3,300,300)}).view()   
+#net,net1,net2,net3 = get_feature_layer()
+##ne2=residual_predict(net3)
+##ne3=mx.sym.Convolution(data=ne2,num_filter=1024,kernel=(3,3),stride=(2,2),pad=(1,1))
+##ne4=mx.sym.Deconvolution(data=ne3,num_filter=512,kernel=(2,2),stride=(2,2),pad=(0,0))
+##ne=deconv_layer(ne3,ne2)
+#mx.viz.plot_network(net1,shape={'data':(128,3,320,320)}).view()   
